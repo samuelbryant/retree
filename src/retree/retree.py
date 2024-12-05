@@ -1,28 +1,33 @@
 from __future__ import annotations
 
 import re
-from typing import Callable, List, Optional, Tuple
+from collections.abc import Callable
 
-class ReTree(object):
-    _children: List[ReTree]
+
+class ReTree:
+    _children: list[ReTree]
     _match: re.Match
     _group_index: int
     _root: ReTree
-    _parent: Optional[ReTree]
+    _parent: ReTree | None
 
     # Used to prevent external code from using __init__
     __unique_key = object()
 
-    def __init__(self, unique_key: object, group_index: int, parent: Optional[ReTree]=None, match: Optional[re.Match]=None) -> None:
+    def __init__(
+        self, unique_key: object, group_index: int, parent: ReTree | None=None,
+        match: re.Match | None=None) -> None:
 
         # Prevent external use of __init__
         assert(unique_key is ReTree.__unique_key), \
-             'ReTree\'s cannot be constructed with default constructor/initializer. Please use TODO'
+            ("ReTree's cannot be constructed with default constructor/"
+            "initializer. Please use `from_match`")
 
         has_parent = parent is not None
         is_root = match is not None
         assert(has_parent is not is_root), \
-            'Must specify exactly one of either "parent" (if a child node) or "match" (if the root node)'
+            ('Must specify exactly one of either "parent" (if a child node) or'
+             '"match" (if the root node)')
 
         self._children = []
         self._group_index = group_index
@@ -36,7 +41,7 @@ class ReTree(object):
             self._root = self
 
     @classmethod
-    def from_match(cls, match: Optional[re.Match]) -> Optional[ReTree]:
+    def from_match(cls, match: re.Match | None) -> ReTree | None:
         """Converts a regex match object into a regex match tree."""
         if match is None:
             return None
@@ -49,7 +54,7 @@ class ReTree(object):
         return root
 
     @classmethod
-    def pattern_match(cls, pattern: re.Pattern, text: str) -> Optional[ReTree]:
+    def pattern_match(cls, pattern: re.Pattern, text: str) -> ReTree | None:
         """
         Tests if string matches pattern and returns results as regex match tree.
         """
@@ -63,7 +68,7 @@ class ReTree(object):
         return self.text
 
     @property
-    def children(self) -> List[ReTree]:
+    def children(self) -> list[ReTree]:
         return self._children
 
     @property
@@ -75,7 +80,7 @@ class ReTree(object):
         return self._group_index
 
     @property
-    def parent(self) -> Optional[ReTree]:
+    def parent(self) -> ReTree | None:
         return self._parent
 
     @property
@@ -83,7 +88,7 @@ class ReTree(object):
         return self._root
 
     @property
-    def span(self) -> Tuple[int, int]:
+    def span(self) -> tuple[int, int]:
         return self._match.span(self._group_index)
 
     @property
@@ -118,7 +123,7 @@ class ReTree(object):
             return False
 
         # Check if given group is a subgroup of any of this group's children
-        added = any([ child._add(group_index) for child in self._children ])
+        added = any( child._add(group_index) for child in self._children )
 
         # If not, then it must be a direct child of this group
         if not added:
@@ -139,12 +144,13 @@ class ReTree(object):
 
 
 
-class ReTreeDisplay(object):
+class ReTreeDisplay:
 
     def get_index_fmt(self, node: ReTree) -> int:
         return len(str(node.match.lastindex))
 
-    def print_tree(self, node: ReTree, indent: str='', show_index: bool=False) -> None:
+    def print_tree(
+        self, node: ReTree, indent: str='', show_index: bool=False) -> None:
         if show_index:
             index_fmt = '%-' + str(self.get_index_fmt(node) + 1) + 'd'
             index_str = index_fmt % node.index

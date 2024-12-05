@@ -18,4 +18,7 @@ fi
 
 project_dir=$(realpath ".")
 module_dir="${project_dir}/src/retree"
-export PYTHONPATH="${module_dir}:$PYTHONPATH"
+# Ensure it's not already on class path to avoid pollution
+if [[ ! "$PYTHONPATH" =~ "${module_dir}" ]]; then
+    export PYTHONPATH="${module_dir}:$PYTHONPATH"
+fi
