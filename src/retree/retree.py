@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Optional, List
+from typing import Callable, List, Optional, Tuple
 
 class ReTree(object):
     _children: List[ReTree]
@@ -26,17 +26,17 @@ class ReTree(object):
 
         self._children = []
         self._group_index = group_index
-        if has_parent:
+        if parent is not None:
             self._match = parent.match
             self._root = parent.root
             self._parent = parent
-        else:
+        elif match is not None:
             self._match = match
             self._parent = None
             self._root = self
 
     @classmethod
-    def from_match(cls, match: Optional[re.Match]) -> ReTree:
+    def from_match(cls, match: Optional[re.Match]) -> Optional[ReTree]:
         """Converts a regex match object into a regex match tree."""
         if match is None:
             return None
@@ -90,28 +90,28 @@ class ReTree(object):
     def text(self) -> str:
         return self._match.group(self._group_index)
 
-    def is_root(self):
+    def is_root(self) -> bool:
         return self.root == self
 
-    def has_children(self):
+    def has_children(self) -> bool:
         return len(self._children) > 0
 
-    def get_depth(self):
+    def get_depth(self) -> int:
         if not self.has_children():
             return 1
         depths = [(c.get_depth() + 1) for c in self.children]
         return max(depths)
 
-    def do_for_all(self, func):
+    def do_for_all(self, func: Callable[[ReTree],None]) -> None:
         func(self)
         for c in self.children:
             c.do_for_all(func)
 
-    def display(self, show_index=False):
+    def display(self, show_index: bool=False) -> None:
         rtd = ReTreeDisplay()
         rtd.print_tree(self, show_index=show_index)
 
-    def _add(self, group_index) -> bool:
+    def _add(self, group_index: int) -> bool:
         """Adds sub-match group to tree. Used in initial construction."""
         # Check that given group index corresponds to subgroup of this group
         if not self._contains_group_index(group_index):
@@ -131,7 +131,7 @@ class ReTree(object):
         self._children.append(child)
         return child
 
-    def _contains_group_index(self, group_index):
+    def _contains_group_index(self, group_index: int) -> bool:
         """Checks if match group with given index is within this match group."""
         span1 = self.span
         span2 = self.match.span(group_index)
@@ -141,10 +141,10 @@ class ReTree(object):
 
 class ReTreeDisplay(object):
 
-    def get_index_fmt(self, node):
+    def get_index_fmt(self, node: ReTree) -> int:
         return len(str(node.match.lastindex))
 
-    def print_tree(self, node, indent='', show_index=False):
+    def print_tree(self, node: ReTree, indent: str='', show_index: bool=False) -> None:
         if show_index:
             index_fmt = '%-' + str(self.get_index_fmt(node) + 1) + 'd'
             index_str = index_fmt % node.index
@@ -153,5 +153,3 @@ class ReTreeDisplay(object):
             print('%-s%-s' % (indent, node.text))
         for c in node.children:
             self.print_tree(c, indent=indent + '  ', show_index=show_index)
-
-
