@@ -1,93 +1,121 @@
 # retree
 
+retree is a tool designed to work with `re`, python's regex library to restructure regex output into a tree.
+
+To be precise, it takes the output of a regex match (`re.Match`), which may contain several nested capture groups, and converts it into a tree (`retree.ReTree`) preserving the hierarchical group information.
+
+This library is designed to be:
+    - simple and easy to understand
+    - well-tested
+    - efficient
+
+I developed this after discovering it wasn't already built-in to the `re` library.
 
 
-## Getting started
+## Basic usage
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### Quick Examples
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
+1. Display the result of regex match groups as a tree:
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/sambryant/retree.git
-git branch -M main
-git push -uf origin main
+>>> regex     = 'Hello ([^ ]+), today is (([0-9]{4})-([0-9]{2})-([0-9]{2}))'
+>>> test_case = 'Hello Maxwell, today is 2024-12-05'
+>>> pattern = re.compile(regex)
+>>> root = ReTree.pattern_match(pattern, test_case)
+>>> root.display(show_index=False)
+Hello Maxwell, today is 2024-12-05
+  Maxwell
+  2024-12-05
+    2024
+    12
+    05
+```
+Can also display the original group indices:
+```
+>>> root.display(show_index=True)
+0 Hello Maxwell, today is 2024-12-05
+1   Maxwell
+2   2024-12-05
+3     2024
+4     12
+5     05
 ```
 
-## Integrate with your tools
+2. Interact with matched groups via a tree.
+```
+>>> regex     = 'Hello ([^ ]+), today is (([0-9]{4})-([0-9]{2})-([0-9]{2}))'
+>>> test_case = 'Hello Maxwell, today is 2024-12-05'
+>>> pattern = re.compile(regex)
+>>> root = ReTree.pattern_match(pattern, test_case)
+assert(root.text == test_case)
+assert(root.children[0].text == 'Maxwell')
+assert(root.children[1].text == '2024-12-05')
+assert(root.children[1].children[0].text == '2024')
+```
 
-- [ ] [Set up project integrations](https://gitlab.com/sambryant/retree/-/settings/integrations)
+3. Apply functions by visiting tree nodes
+```
+>>> def print_node(node):
+>>>    print('index = %d, depth = %d, text = %s' % (node.index, node.get_depth(), node.text))
+>>>
+>>> root.do_for_all(lambda x : print_node(x))
+index = 0, depth = 3, text = Hello Maxwell, today is 2024-12-05
+index = 1, depth = 1, text = Maxwell
+index = 2, depth = 2, text = 2024-12-05
+index = 3, depth = 1, text = 2024
+index = 4, depth = 1, text = 12
+index = 5, depth = 1, text = 05
+```
 
-## Collaborate with your team
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+### Comparison with Vanilla
 
-## Test and Deploy
+**Vanilla Python**
+A normal usage of python's `re` library may look like the following:
+```
+# In this example, we use regex to parse lines of log files which look like:
+# 2024-12-05: <ERR>: This is an error message
+date_regex = '(([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}))'
+type_regex = '<([^>]+)>'
+mesg_regex = '(.*)'
+regex     = '%s: %s: %s' % (date_regex, type_regex, mesg_regex)
+test_case = '2024-12-05: <MSG>: This is a log message'
 
-Use the built-in continuous integration in GitLab.
+pattern = re.compile(regex)
+match = pattern.match(test_case)
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+print(match.group(0)) # 2024-12-05: <MSG>: This is a log message
+print(match.group(1)) # 2024-12-05
+print(match.group(2)) # 2024
+print(match.group(3)) # 12
+print(match.group(4)) # 05
+print(match.group(5)) # MSG
+print(match.group(6)) # This is a log message
+```
 
-***
+The problem is that there is no way to interact with this data hierarchically. We can only view it as a list where, for example, `2024` and `2024-12-05` have no formal relationship.
 
-# Editing this README
+**With retree**
+With the retree library we can convert this information into a tree:
+```
+import re, retree
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# Same regex and test case as above
+date_regex = '(([0-9]{4})-([0-9]{2})-([0-9]{2}))'
+type_regex = '<([^>]+)>'
+mesg_regex = '(.*)'
+regex     = '%s: %s: %s' % (date_regex, type_regex, mesg_regex)
+test_case = '2024-12-05: <MSG>: This is a log message'
 
-## Suggestions for a good README
+pattern = re.compile(regex)
+root = ReTree.pattern_match(pattern, test_case)
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+print(root)                           # 2024-12-05: <MSG>: This is a log message
+print(root.children[0])               # 2024-12-05
+print(root.children[0].children[0])   # 2024
+print(root.children[0].children[1])   # 12
+print(root.children[0].children[2])   # 05
+print(root.children[1])               # MSG
+print(root.children[2])               # This is a log message
+```
 
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
