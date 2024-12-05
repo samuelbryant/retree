@@ -1,0 +1,2 @@
+To mirror this from gitlab to github, remember to execute:
+git remote set-url --add origin git@github.com:samuelbryant/retree.git
